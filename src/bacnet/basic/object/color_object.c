@@ -62,7 +62,7 @@ static OS_Keylist Object_List;
 static color_write_present_value_callback Color_Write_Present_Value_Callback;
 
 /* These three arrays are used by the ReadPropertyMultiple handler */
-static const int Color_Properties_Required[] = {
+static const int Properties_Required[] = {
     PROP_OBJECT_IDENTIFIER, PROP_OBJECT_NAME,
     PROP_OBJECT_TYPE,       PROP_PRESENT_VALUE,
     PROP_TRACKING_VALUE,    PROP_COLOR_COMMAND,
@@ -70,10 +70,10 @@ static const int Color_Properties_Required[] = {
     PROP_DEFAULT_FADE_TIME, -1
 };
 
-static const int Color_Properties_Optional[] = { PROP_DESCRIPTION,
-                                                 PROP_TRANSITION, -1 };
+static const int Properties_Optional[] = { PROP_DESCRIPTION, PROP_TRANSITION,
+                                           -1 };
 
-static const int Color_Properties_Proprietary[] = { -1 };
+static const int Properties_Proprietary[] = { -1 };
 
 /**
  * Returns the list of required, optional, and proprietary properties.
@@ -90,13 +90,13 @@ void Color_Property_Lists(
     const int **pRequired, const int **pOptional, const int **pProprietary)
 {
     if (pRequired) {
-        *pRequired = Color_Properties_Required;
+        *pRequired = Properties_Required;
     }
     if (pOptional) {
-        *pOptional = Color_Properties_Optional;
+        *pOptional = Properties_Optional;
     }
     if (pProprietary) {
-        *pProprietary = Color_Properties_Proprietary;
+        *pProprietary = Properties_Proprietary;
     }
 
     return;
@@ -998,12 +998,19 @@ bool Color_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
     len = bacapp_decode_known_property(
         apdu, apdu_size, &value, wp_data->object_type,
         wp_data->object_property);
-    /* FIXME: len < application_data_len: more data? */
     if (len < 0) {
-        /* error while decoding - a value larger than we can handle */
-        wp_data->error_class = ERROR_CLASS_PROPERTY;
-        wp_data->error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
-        return false;
+        if (property_lists_member(
+                Properties_Required, Properties_Optional,
+                Properties_Proprietary, wp_data->object_property)) {
+            /* error while decoding - a value larger than we can handle */
+            wp_data->error_class = ERROR_CLASS_PROPERTY;
+            wp_data->error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
+            return false;
+        } else {
+            wp_data->error_class = ERROR_CLASS_PROPERTY;
+            wp_data->error_code = ERROR_CODE_UNKNOWN_PROPERTY;
+            return false;
+        }
     }
     switch (wp_data->object_property) {
         case PROP_PRESENT_VALUE:
@@ -1056,18 +1063,16 @@ bool Color_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
                     &wp_data->error_code);
             }
             break;
-        case PROP_OBJECT_IDENTIFIER:
-        case PROP_OBJECT_TYPE:
-        case PROP_OBJECT_NAME:
-        case PROP_DESCRIPTION:
-        case PROP_TRACKING_VALUE:
-        case PROP_IN_PROGRESS:
-            wp_data->error_class = ERROR_CLASS_PROPERTY;
-            wp_data->error_code = ERROR_CODE_WRITE_ACCESS_DENIED;
-            break;
         default:
-            wp_data->error_class = ERROR_CLASS_PROPERTY;
-            wp_data->error_code = ERROR_CODE_UNKNOWN_PROPERTY;
+            if (property_lists_member(
+                    Properties_Required, Properties_Optional,
+                    Properties_Proprietary, wp_data->object_property)) {
+                wp_data->error_class = ERROR_CLASS_PROPERTY;
+                wp_data->error_code = ERROR_CODE_WRITE_ACCESS_DENIED;
+            } else {
+                wp_data->error_class = ERROR_CLASS_PROPERTY;
+                wp_data->error_code = ERROR_CODE_UNKNOWN_PROPERTY;
+            }
             break;
     }
 

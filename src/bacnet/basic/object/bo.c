@@ -1116,12 +1116,15 @@ bool Binary_Output_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
         /* error while decoding - a value larger than we can handle */
         wp_data->error_class = ERROR_CLASS_PROPERTY;
         wp_data->error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
-        return false;
+    } else {
+        status = true;
     }
     switch (wp_data->object_property) {
         case PROP_PRESENT_VALUE:
-            status = write_property_type_valid(
-                wp_data, &value, BACNET_APPLICATION_TAG_ENUMERATED);
+            if (status) {
+                status = write_property_type_valid(
+                    wp_data, &value, BACNET_APPLICATION_TAG_ENUMERATED);
+            }
             if (status) {
                 status = Binary_Output_Present_Value_Write(
                     wp_data->object_instance, value.type.Enumerated,
@@ -1138,8 +1141,10 @@ bool Binary_Output_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
             }
             break;
         case PROP_OUT_OF_SERVICE:
-            status = write_property_type_valid(
-                wp_data, &value, BACNET_APPLICATION_TAG_BOOLEAN);
+            if (status) {
+                status = write_property_type_valid(
+                    wp_data, &value, BACNET_APPLICATION_TAG_BOOLEAN);
+            }
             if (status) {
                 Binary_Output_Out_Of_Service_Set(
                     wp_data->object_instance, value.type.Boolean);
@@ -1157,8 +1162,6 @@ bool Binary_Output_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
             }
             break;
     }
-    /* not using len at this time */
-    (void)len;
 
     return status;
 }
